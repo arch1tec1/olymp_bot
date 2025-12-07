@@ -10,7 +10,7 @@ from keyboards import get_organizer_kb
 call = Router()
 
 
-@call.message(F.text == "Связь с организаторами")
+@call.message(F.text == "🔔 Связь с организаторами")
 async def contact_menu(message: types.Message):
     """Выбор пичины для связи с организаторами."""
 

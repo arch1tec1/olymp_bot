@@ -38,7 +38,7 @@ async def cmd_start(message: types.Message):
     )
 
 
-@registration.message(F.text == "Зарегистрироваться")
+@registration.message(F.text == "📝 Зарегистрироваться")
 async def start_register(message: types.Message, state: FSMContext):
     """Регистрация пользователя, ввод Ф.И.О."""
 

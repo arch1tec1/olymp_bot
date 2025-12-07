@@ -10,6 +10,7 @@ from config import (
     bot,
     dp,
     active_alerts,
+    active_dialogs,
     ADMIN_IDS,
     UserState,
     AdminState,
@@ -33,6 +34,9 @@ async def admin_start_reply(callback: types.CallbackQuery, state: FSMContext):
     current_admin_id = callback.from_user.id
     admin_username = callback.from_user.username
 
+    active_dialogs[user_id] = current_admin_id 
+    # ------------------------------
+
     try:
         user_storage_key = StorageKey(
             bot_id=callback.bot.id, chat_id=user_id, user_id=user_id
@@ -54,6 +58,8 @@ async def admin_start_reply(callback: types.CallbackQuery, state: FSMContext):
     except Exception as e:
         print(f"CRITICAL ERROR связывания: {e}")
         await callback.message.answer("❌ Ошибка связи с пользователем.")
+        if user_id in active_dialogs:
+            del active_dialogs[user_id]
         return
 
     await state.update_data(dialog_user_id=user_id)
@@ -67,31 +73,32 @@ async def admin_start_reply(callback: types.CallbackQuery, state: FSMContext):
         if (current_admin_id, clicked_msg_id) in group:
             target_group = group
             break
+
     if not target_group:
         target_group = [(current_admin_id, clicked_msg_id)]
 
-    current_text = (
-        callback.message.html_text or
-        callback.message.caption or
-        callback.message.text
+    current_text = callback.message.caption or callback.message.text or ""
+
+    signature = (
+        f"\n\n✅ <b>Организатор @{admin_username} "
+        f"отреагировал на алерт.</b>"
     )
-    signature = f"\n\n✅ <b>Организатор @{admin_username} "
-    "отреагировал на алерт.</b>"
-    final_text = current_text or ""
+
+    final_text = current_text
     if final_text and "отреагировал на алерт" not in final_text:
         final_text += signature
 
     for admin_chat_id, msg_id in target_group:
         try:
+            await bot.edit_message_text(
+                chat_id=admin_chat_id,
+                message_id=msg_id,
+                text=final_text,
+                parse_mode="HTML",
+                reply_markup=None,
+            )
+        except Exception:
             try:
-                await bot.edit_message_text(
-                    chat_id=admin_chat_id,
-                    message_id=msg_id,
-                    text=final_text,
-                    parse_mode="HTML",
-                    reply_markup=None,
-                )
-            except Exception:
                 await bot.edit_message_caption(
                     chat_id=admin_chat_id,
                     message_id=msg_id,
@@ -99,8 +106,11 @@ async def admin_start_reply(callback: types.CallbackQuery, state: FSMContext):
                     parse_mode="HTML",
                     reply_markup=None,
                 )
-        except Exception:
-            pass
+            except Exception as e:
+                print(
+                    f"Не удалось обновить сообщение"
+                    f"у админа {admin_chat_id}: {e}"
+                    )
 
     try:
         if user_id in active_alerts and target_group in active_alerts[user_id]:

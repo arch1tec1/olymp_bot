@@ -20,10 +20,6 @@ async def open_admin_panel(message: types.Message, state: FSMContext):
         return
 
     await state.clear()
-    await message.answer(
-        "🦾 Админ-панель открыта.",
-        reply_markup=get_admin_panel_kb()
-        )
 
 
 @start_admin.message(F.text == "⬅️ Назад в меню")
@@ -31,7 +27,3 @@ async def exit_admin(message: types.Message, state: FSMContext):
     """Назад в меню."""
 
     await state.clear()
-
-    await message.answer(
-        "Вышли в главное меню.", reply_markup=get_main_kb(message.from_user.id)
-    )

@@ -11,7 +11,7 @@ from models import User, async_session
 get_creds = Router()
 
 
-@get_creds.message(F.text == "Получить логин и пароль")
+@get_creds.message(F.text == "🔐 Получить логин и пароль")
 async def get_credentials(message: types.Message):
     """Получение логина и пароля."""
 
