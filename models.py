@@ -1,13 +1,16 @@
+"""Модели для базы данных"""
 from sqlalchemy import Column, Integer, String, BigInteger
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "postgresql+asyncpg://postgres:228337@localhost/data"
+from config import DATABASE_URL
 
 Base = declarative_base()
 
 
 class User(Base):
+    """Задание необходимых столбцов в БД."""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -32,5 +35,7 @@ async_session = sessionmaker(
 
 
 async def init_db():
+    """Инициализируем БД."""
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

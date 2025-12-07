@@ -1,12 +1,20 @@
-from aiogram import F, types
+"""Запрос участником кредов."""
+import sys
+import os
+from aiogram import F, types, Router
 from sqlalchemy import select
 
-from ..config import router
-from ..models import User, async_session
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from models import User, async_session
 
 
-@router.message(F.text == "Получить логин и пароль")
+get_creds = Router()
+
+
+@get_creds.message(F.text == "Получить логин и пароль")
 async def get_credentials(message: types.Message):
+    """Получение логина и пароля."""
+
     async with async_session() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == message.from_user.id)

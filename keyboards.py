@@ -1,4 +1,4 @@
-"""Кнопки пользователей бота"""
+"""Кнопки пользователей бота."""
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -9,7 +9,7 @@ from config import ADMIN_IDS
 
 
 def get_main_kb(user_id: int):
-    """Панель участника олимпиады"""
+    """Панель участника олимпиады."""
 
     buttons = [
         [KeyboardButton(text="📝 Зарегистрироваться")],
@@ -24,7 +24,7 @@ def get_main_kb(user_id: int):
 
 
 def get_organizer_kb():
-    """В (Связь с организаторами)"""
+    """В (Связь с организаторами)."""
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -44,7 +44,7 @@ def get_organizer_kb():
 
 
 def get_admin_panel_kb():
-    """Админ-панель"""
+    """Админ-панель."""
 
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -57,7 +57,7 @@ def get_admin_panel_kb():
 
 
 def get_admin_dialog_kb():
-    """Диалог админа с участником"""
+    """Диалог админа с участником."""
 
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="❌ Закончить диалог")]],
@@ -66,7 +66,7 @@ def get_admin_dialog_kb():
 
 
 def get_selection_kb(items, prefix):
-    """Генератор для списка УЗ и классов/курсов обучения"""
+    """Генератор для списка УЗ и классов/курсов обучения."""
 
     buttons = []
     row = []

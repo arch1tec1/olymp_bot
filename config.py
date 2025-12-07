@@ -1,24 +1,21 @@
 import logging
 import os
 
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
 
-from middlewares import MediaGroupMiddleware
 
 load_dotenv()
 API_TOKEN = os.getenv("API_TOKEN")
+ADMIN_IDS = [int(id) for id in os.getenv("ADMIN_IDS").split()]
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
-router = Router()
-
-router.message.middleware(MediaGroupMiddleware(latency=0.5))
-dp.include_router(router)
 
 # { user_id_автора: [ [(admin_id, message_id), ...], [...] ] }
 active_alerts: dict[int, list[list[tuple[int, int]]]] = {}
@@ -33,14 +30,17 @@ SCHOOLS = [
     "МГТУ им. Баумана",
 ]
 
-GRADES = (
-    [f"{i} класс" for i in range(1, 12)] +
-    [f"{i} курс" for i in range(1, 5)]
-    )
+GRADES = [
+    f"{i} класс" for i in range(1, 12)
+    ] + [
+        f"{i} курс" for i in range(1, 5)
+        ]
 
 
 # FSM
 class Registration(StatesGroup):
+    """Регистрации нового пользователя в системе."""
+
     full_name = State()
     phone = State()
     school = State()
@@ -50,6 +50,8 @@ class Registration(StatesGroup):
 
 
 class Report(StatesGroup):
+    """Подача участником репорта (жалобы) о нарушении."""
+
     offender_username = State()
     description = State()
     proof = State()
@@ -57,17 +59,29 @@ class Report(StatesGroup):
 
 
 class Support(StatesGroup):
+    """Обращение участника к организаторам."""
+
     waiting_for_message = State()
     last_bot_msg_id = State()
 
 
 class AdminPanel(StatesGroup):
+    """Режимы работы организатора через панель управления бота."""
+
     waiting_for_broadcast_content = State()
     waiting_for_user_search = State()
     in_dialog = State()
 
 
+class AdminState(StatesGroup):
+    """Для единственного ответа на репорт/жалобу ."""
+
+    waiting_for_reply = State()
+
+
 class UserState(StatesGroup):
+    """Режимы работы участника с организатором."""
+
     in_dialog_with_admin = State()
 
 

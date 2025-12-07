@@ -1,6 +1,9 @@
+"""Регистрация участников в системе."""
 import re
 import string
 import secrets
+import sys
+import os
 
 from aiogram import F, Router, types
 from aiogram.filters import Command
@@ -8,12 +11,13 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
-from ..config import GRADES, SCHOOLS, bot, Registration, try_delete
-from ..keyboards import get_main_kb, get_selection_kb
-from ..models import User, async_session
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from config import GRADES, SCHOOLS, bot, Registration, try_delete
+from keyboards import get_main_kb, get_selection_kb
+from models import User, async_session
 
 
-router = Router()
+registration = Router()
 
 
 def generate_credentials(db_id):
@@ -25,7 +29,7 @@ def generate_credentials(db_id):
     return login, password
 
 
-@router.message(Command("start"))
+@registration.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Нажатие на кнопку старт или /start."""
 
@@ -34,7 +38,7 @@ async def cmd_start(message: types.Message):
     )
 
 
-@router.message(F.text == "Зарегистрироваться")
+@registration.message(F.text == "Зарегистрироваться")
 async def start_register(message: types.Message, state: FSMContext):
     """Регистрация пользователя, ввод Ф.И.О."""
 
@@ -59,7 +63,7 @@ async def start_register(message: types.Message, state: FSMContext):
     await state.update_data(last_bot_msg_id=msg.message_id)
 
 
-@router.message(Registration.full_name)
+@registration.message(Registration.full_name)
 async def process_name(message: types.Message, state: FSMContext):
     """Сохранение Ф.И.О. и ввод номера телефона."""
 
@@ -80,7 +84,7 @@ async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(last_bot_msg_id=msg.message_id)
 
 
-@router.message(Registration.phone)
+@registration.message(Registration.phone)
 async def process_phone(message: types.Message, state: FSMContext):
     """Проверка введенного телефона и сохранение, ввод уч.зав."""
 
@@ -116,7 +120,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     await state.update_data(last_bot_msg_id=msg.message_id)
 
 
-@router.callback_query(Registration.school, F.data.startswith("school_"))
+@registration.callback_query(Registration.school, F.data.startswith("school_"))
 async def process_school(callback: types.CallbackQuery, state: FSMContext):
     """Сохранение уч.зав. и выбор класса/курса."""
 
@@ -130,7 +134,7 @@ async def process_school(callback: types.CallbackQuery, state: FSMContext):
     )
 
 
-@router.callback_query(Registration.grade, F.data.startswith("grade_"))
+@registration.callback_query(Registration.grade, F.data.startswith("grade_"))
 async def process_grade(callback: types.CallbackQuery, state: FSMContext):
     """Сохранение класса/курса и ввод эл.почты."""
 
@@ -143,7 +147,7 @@ async def process_grade(callback: types.CallbackQuery, state: FSMContext):
     )
 
 
-@router.message(Registration.email)
+@registration.message(Registration.email)
 async def process_email(message: types.Message, state: FSMContext):
     """Проверка эл.почты и подтверждение введенных данных."""
 
@@ -174,7 +178,10 @@ async def process_email(message: types.Message, state: FSMContext):
     await state.update_data(last_bot_msg_id=msg.message_id)
 
 
-@router.message(Registration.confirm, F.text == "Подтвердить введенные данные")
+@registration.message(
+    Registration.confirm,
+    F.text == "Подтвердить введенные данные"
+    )
 async def finish_registration(message: types.Message, state: FSMContext):
     """Сохранение данных в БД, вывод финального сообщения."""
 
