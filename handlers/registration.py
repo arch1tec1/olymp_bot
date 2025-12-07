@@ -1,0 +1,218 @@
+import re
+import string
+import secrets
+
+from aiogram import F, Router, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from sqlalchemy import select
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
+from ..config import GRADES, SCHOOLS, bot, Registration, try_delete
+from ..keyboards import get_main_kb, get_selection_kb
+from ..models import User, async_session
+
+
+router = Router()
+
+
+def generate_credentials(db_id):
+    """Генерация логина и пароля."""
+
+    login = f"user{db_id}"
+    alphabet = string.ascii_letters + string.digits
+    password = "".join(secrets.choice(alphabet) for i in range(20))
+    return login, password
+
+
+@router.message(Command("start"))
+async def cmd_start(message: types.Message):
+    """Нажатие на кнопку старт или /start."""
+
+    await message.answer(
+        "Добро пожаловать...", reply_markup=get_main_kb(message.from_user.id)
+    )
+
+
+@router.message(F.text == "Зарегистрироваться")
+async def start_register(message: types.Message, state: FSMContext):
+    """Регистрация пользователя, ввод Ф.И.О."""
+
+    await try_delete(bot, message.chat.id, message.message_id)
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if result.scalar():
+            msg = await message.answer(
+                "Вы уже зарегистрированы! Получите логин и пароль."
+            )
+            return
+
+    await state.set_state(Registration.full_name)
+
+    msg = await message.answer(
+        "Введите ваше Ф.И.О. (полностью):",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    await state.update_data(last_bot_msg_id=msg.message_id)
+
+
+@router.message(Registration.full_name)
+async def process_name(message: types.Message, state: FSMContext):
+    """Сохранение Ф.И.О. и ввод номера телефона."""
+
+    data = await state.get_data()
+
+    if "last_bot_msg_id" in data:
+        await try_delete(bot, message.chat.id, data["last_bot_msg_id"])
+
+    await try_delete(bot, message.chat.id, message.message_id)
+
+    await state.update_data(full_name=message.text)
+
+    await state.set_state(Registration.phone)
+    msg = await message.answer(
+        "Введите номер телефона в формате +7 (999) 000-00-00:"
+        )
+
+    await state.update_data(last_bot_msg_id=msg.message_id)
+
+
+@router.message(Registration.phone)
+async def process_phone(message: types.Message, state: FSMContext):
+    """Проверка введенного телефона и сохранение, ввод уч.зав."""
+
+    data = await state.get_data()
+    pattern = r"^\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}$"
+
+    if not re.match(pattern, message.text):
+
+        await try_delete(bot, message.chat.id, message.message_id)
+
+        if "last_bot_msg_id" in data:
+            await try_delete(bot, message.chat.id, data["last_bot_msg_id"])
+
+        msg = await message.answer(
+            "Ошибка формата! Введите строго в указанном формате: "
+            "+7 (999) 000-00-00"
+        )
+
+        await state.update_data(last_bot_msg_id=msg.message_id)
+        return
+
+    if "last_bot_msg_id" in data:
+        await try_delete(bot, message.chat.id, data["last_bot_msg_id"])
+    await try_delete(bot, message.chat.id, message.message_id)
+
+    await state.update_data(phone=message.text)
+    await state.set_state(Registration.school)
+
+    msg = await message.answer(
+        "Выберите учебное заведение:",
+        reply_markup=get_selection_kb(SCHOOLS[:10], "school"),
+    )
+    await state.update_data(last_bot_msg_id=msg.message_id)
+
+
+@router.callback_query(Registration.school, F.data.startswith("school_"))
+async def process_school(callback: types.CallbackQuery, state: FSMContext):
+    """Сохранение уч.зав. и выбор класса/курса."""
+
+    school_name = callback.data.split("_")[1]
+    await state.update_data(school=school_name)
+    await state.set_state(Registration.grade)
+
+    await callback.message.edit_text(
+        f"Выбрано: {school_name}\nТеперь выберите класс/курс:",
+        reply_markup=get_selection_kb(GRADES, "grade"),
+    )
+
+
+@router.callback_query(Registration.grade, F.data.startswith("grade_"))
+async def process_grade(callback: types.CallbackQuery, state: FSMContext):
+    """Сохранение класса/курса и ввод эл.почты."""
+
+    grade_name = callback.data.split("_")[1]
+    await state.update_data(grade=grade_name)
+    await state.set_state(Registration.email)
+
+    await callback.message.edit_text(
+        f"Выбрано: {grade_name}\nВведите вашу электронную почту:"
+    )
+
+
+@router.message(Registration.email)
+async def process_email(message: types.Message, state: FSMContext):
+    """Проверка эл.почты и подтверждение введенных данных."""
+
+    data = await state.get_data()
+
+    if "@" not in message.text or "." not in message.text:
+        await try_delete(
+            bot, message.chat.id, message.message_id
+        )
+        return
+
+    await state.update_data(email=message.text)
+    await state.set_state(Registration.confirm)
+
+    await try_delete(bot, message.chat.id, message.message_id)
+
+    if "last_bot_msg_id" in data:
+        await try_delete(bot, message.chat.id, data["last_bot_msg_id"])
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Подтвердить и получить доступ")]],
+        resize_keyboard=True,
+    )
+    msg = await message.answer(
+        "Все данные заполнены. Нажмите кнопку ниже.", reply_markup=kb
+    )
+
+    await state.update_data(last_bot_msg_id=msg.message_id)
+
+
+@router.message(Registration.confirm, F.text == "Подтвердить введенные данные")
+async def finish_registration(message: types.Message, state: FSMContext):
+    """Сохранение данных в БД, вывод финального сообщения."""
+
+    data = await state.get_data()
+
+    await try_delete(bot, message.chat.id, message.message_id)
+
+    if "last_bot_msg_id" in data:
+        await try_delete(bot, message.chat.id, data["last_bot_msg_id"])
+
+    try:
+        async with async_session() as session:
+            new_user = User(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                full_name=data["full_name"],
+                phone=data["phone"],
+                school=data["school"],
+                grade=data["grade"],
+                email=data["email"],
+            )
+            session.add(new_user)
+            await session.flush()
+            login, pwd = generate_credentials(new_user.id)
+            new_user.login_id = login
+            new_user.plain_password = pwd
+            await session.commit()
+    except Exception as e:
+        await message.answer(f"Ошибка БД: {e}")
+        return
+
+    await state.clear()
+
+    await message.answer(
+        f"✅ Регистрация успешна!\n\n"
+        f"👤 Ваш User ID: `{login}`\n"
+        f"🔑 Ваш Пароль: `{pwd}`\n\n"
+        f"Сохраните эти данные!",
+        parse_mode="Markdown",
+        reply_markup=get_main_kb(message.from_user.id),
+    )
